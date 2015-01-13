@@ -99,6 +99,8 @@ void update_odo(odotype *p);
 typedef struct{
   double linesensor[LINE_SENS_LENGTH];
   int min_line_sensor;
+  int max_line_sensor;
+  int black_line_follow;
   
   double ir_min;
   double irsensor[IR_SENS_LENGTH];
@@ -194,15 +196,25 @@ sensetype sest;
 maptype map;
 logdata dataMatrix;
 
+const double BLACK_THRESHOLD = 0.4;
+const double WHITE_THRESHOLD = 0.8;
+
+int cross_counter;
+int cross;
+int lost_line;
+
 enum {ms_init,ms_goto1,ms_goto_setup,ms_goto2,ms_fwd,ms_follow_line,ms_turn,ms_end};
 
 int main()
 {
+  
   int running,n=0,arg;
   double dist=0,angle=0;
   double waypoints [5][2]={{2, 0},{2,2},{0, 2},{0,0.15},{0,0}};
   int waypointcounter=0;
   int var1, var2;
+  cross_counter = 0;
+  cross = 0;
   /* Establish connection to robot sensors and actuators.
    */
      if (rhdConnect('w',"localhost",ROBOTPORT)!='w'){
@@ -317,7 +329,7 @@ int main()
   mot.t_speed_t=0;
   mot.kfr=mot.kfl=mot.kf=0.23;
   mot.kw=0.2;
-  mot.k_follow=-0.01;
+  mot.k_follow=-0.1;
   mot.kspeed1=5;
   mot.kspeed2=5;
   mot.kspeed3=8;
@@ -325,6 +337,7 @@ int main()
   running=1; 
   mission.state=ms_init;
   mission.oldstate=-1;
+  sest.black_line_follow = 1;
   
   map.cell=0.2; map.xsize=5.0; map.ysize=5.0; map.R_safe=0.4; map.laser_max=3.5, map.theta=0.0;
   for (var1=1; var1<25;var1++){
@@ -366,8 +379,8 @@ int main()
    sm_update(&mission);
    switch (mission.state) {
     case ms_init:
-       n=1; dist=0.10;angle=10.0;
-       mission.state=ms_fwd;//ms_turn;// ms_end;//ms_fwd;//ms_goto_setup;// ms_follow_line;//
+       n=1; dist=3.0;angle=10.0;
+       mission.state=ms_follow_line;//ms_fwd;//ms_turn;// ms_end;//ms_fwd;//ms_goto_setup;// 
        mot.t_speed=40;mot.t_speed_t=20;
        waypointcounter=0;
     break;
@@ -419,8 +432,8 @@ int main()
     
     case ms_fwd:
        if (fwd(dist,mot.t_speed,mission.time))  
-        mission.state=ms_turn;
-	      //mission.state=ms_end; //TODO: revert to turn
+       // mission.state=ms_turn;
+	     mission.state=ms_end;
     break;
     
     case ms_follow_line:
@@ -429,7 +442,7 @@ int main()
     break;
     
     case ms_turn:
-      if (turn(angle,0.1,mission.time)){//mot.t_speed_t
+      if (turn(angle,0.2,mission.time)){//mot.t_speed_t
          n=n-1;
       if (n==0) 
 	      mission.state=ms_end;
@@ -609,9 +622,16 @@ if (p->cmd !=0){
           p->motorspeed_r=0;
        }	  
        else {
+         
           myspeed(p->t_speed, p, q, s);
-          double delta_v = p->k_follow*(s->min_line_sensor-3.5)*p->speedcmd*p->kspeed3;
-                    if (!(p->speedcmd+delta_v>1||p->speedcmd+delta_v<-1||p->speedcmd-delta_v>1||p->speedcmd-delta_v<-1)) 
+          //TODO:put if to switch
+          double delta_v = p->k_follow*(s->min_line_sensor-3.5)*p->speedcmd;//*p->kspeed3;
+          //double delta_v = p->k_follow*(s->max_line_sensor-3.5)*p->speedcmd*p->kspeed3;
+          
+          if(cross==1){
+            delta_v=0;
+          }
+          if (!(p->speedcmd+delta_v>1||p->speedcmd+delta_v<-1||p->speedcmd-delta_v>1||p->speedcmd-delta_v<-1)) 
           {
 	          p->motorspeed_l=p->speedcmd+delta_v;//*kfl/kf
             p->motorspeed_r=p->speedcmd-delta_v;
@@ -685,7 +705,7 @@ int turn(double angle, double speed,int time){
    if (time==0){ 
      
      mot.cmd=mot_turn;
-     mot.t_speedcmd=speed;
+     mot.t_speedcmd_t=speed;
      mot.angle=angle*(M_PI/180);
      return 0;
    }
@@ -766,11 +786,12 @@ void myspeed_t(int aim, motiontype *p, odotype *q, sensetype *s)
   //   lowdist=p->dist-q->ran_dist;
   //else
   //  lowdist=s->ir_min;
+  
+  
   lowangle=p->angle-q->theta;
   if(sqrt(2*0.5*lowangle)< (q->theta-q->old_theta)/0.01)//
-    {
+  {
     p->speed_t--;
-    
   }
   else{
     if(p->speed_t>aim){
@@ -784,59 +805,94 @@ void myspeed_t(int aim, motiontype *p, odotype *q, sensetype *s)
   //  p->speed=0;
   p->speedcmd_t=p->speed_t/127.0;
 }
+
 void update_sensors(sensetype *s, odotype *q)
-{
+{ 
   
+  int line_counter =0;
+  int white_line_counter = 0;
   int i = 0;
-  double min = 20;
-  int min_sensor = -1;
+  int min_line_sensor = 3;
+  int max_line_sensor = 3; // for the center on case all sensors are the same
   double sum_i = 0, sum_x_i = 0, sum_in = 0, sum_x_in = 0;
   double Ka[5]={0, 15.5488, 14.6827, 14.0957,0 };
   double Kb[5]={1, 82.3226, 81.5651, 68.1602, 1};
   s->ir_min=4;
-  for (;i < LINE_SENS_LENGTH; i++)
+  
+  /**** Line sensors ****/
+  for (i=0; i < LINE_SENS_LENGTH; i++)
   {
-    
+    //Read in from sensor and ajust with calibration values
     s->linesensor[i] = linesensor->data[i] * linesensor_interp[0][i] + linesensor_interp[1][i];
-    if (s->linesensor[i] < min){
-      min = s->linesensor[i];
-      min_sensor = i;
+    
+    if (s->linesensor[i] < s->linesensor[min_line_sensor]){
+      min_line_sensor = i;
+    }
+    if(s->linesensor[i] > s->linesensor[max_line_sensor]){
+      max_line_sensor = i;
     }
     sum_i += s->linesensor[i];
     sum_x_i += s->linesensor[i]*i;
     
+    //count number of sensors who see black line
+    if(s->linesensor[i] < BLACK_THRESHOLD){
+      line_counter++;
+    }
+
+    //count number of sensors who see white line
+    else if(s->linesensor[i] > WHITE_THRESHOLD){
+      white_line_counter++;
+    }
+    
   }
-  s->min_line_sensor=min_sensor;
-  if (min_sensor == 0)
-  {
-    sum_in = s->linesensor[min_sensor]+s->linesensor[min_sensor+1];
-    sum_x_in = s->linesensor[min_sensor]*min_sensor +
-              s->linesensor[min_sensor+1]*(min_sensor+1);
+  
+  
+  if(line_counter == 8 && !cross){ 
+    cross_counter++;
+    cross=1;
   }
-  else if (min_sensor == 7)
+  if(line_counter < 8){ 
+    cross=0;
+  }
+  
+  
+  printf("Cross_counter: %d \n", cross_counter);
+  s->min_line_sensor=min_line_sensor;
+  s->max_line_sensor=max_line_sensor;
+  
+  if (min_line_sensor == 0)
   {
-    sum_in = s->linesensor[min_sensor]+s->linesensor[min_sensor-1];
-    sum_x_in = s->linesensor[min_sensor]*min_sensor +
-              s->linesensor[min_sensor-1]*(min_sensor-1);
+    sum_in = s->linesensor[min_line_sensor]+s->linesensor[min_line_sensor+1];
+    sum_x_in = s->linesensor[min_line_sensor]*min_line_sensor +
+              s->linesensor[min_line_sensor+1]*(min_line_sensor+1);
+  }
+  else if (min_line_sensor == 7)
+  {
+    sum_in = s->linesensor[min_line_sensor]+s->linesensor[min_line_sensor-1];
+    sum_x_in = s->linesensor[min_line_sensor]*min_line_sensor +
+              s->linesensor[min_line_sensor-1]*(min_line_sensor-1);
   }
   else
   {
-    sum_in = s->linesensor[min_sensor]+s->linesensor[min_sensor+1]+s->linesensor[min_sensor-1];
-    sum_x_in = s->linesensor[min_sensor]*min_sensor + 
-                s->linesensor[min_sensor+1]*(min_sensor+1) + 
-                s->linesensor[min_sensor-1]*(min_sensor-1);
+    sum_in = s->linesensor[min_line_sensor]+s->linesensor[min_line_sensor+1]+s->linesensor[min_line_sensor-1];
+    sum_x_in = s->linesensor[min_line_sensor]*min_line_sensor + 
+                s->linesensor[min_line_sensor+1]*(min_line_sensor+1) + 
+                s->linesensor[min_line_sensor-1]*(min_line_sensor-1);
   }
   if (dataMatrix.counter<LOGLENGTH)
   {
-     dataMatrix.log[i+3][dataMatrix.counter] = sum_x_i/ sum_i;
-     dataMatrix.log[i+4][dataMatrix.counter] = sum_x_in/sum_in;
+    for(i=0; i < 8; i++)
+     dataMatrix.log[i+3][dataMatrix.counter] = s->linesensor[i];
      
   }
   
   
+  /**** IR sensors ****/
+  
   
   for (i =1; i<IR_SENS_LENGTH-2; i++)
   {
+    //Read in from sensor
     s->irsensor[i] = irsensor->data[i];
     
     s->ir_dist[i]=Ka[i]/(s->irsensor[i]-Kb[i]);
@@ -846,11 +902,12 @@ void update_sensors(sensetype *s, odotype *q)
       s->ir_min=s->ir_dist[i];
     if (dataMatrix.counter<LOGLENGTH)
     {  
-      dataMatrix.log[i+3][dataMatrix.counter] = s->irsensor[i];
+      //dataMatrix.log[i+3][dataMatrix.counter] = s->irsensor[i];
     }
   }
-  //printf("\n");
   
+  
+  /**** Laser ****/
   for (i =0; i<10; i++)
   { if (laserpar[i]>3.5)
       s->laser[i]=3.5;
