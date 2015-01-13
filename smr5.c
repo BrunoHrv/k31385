@@ -62,8 +62,8 @@ componentservertype lmssrv,camsrv;
      }
 
 #define WHEEL_DIAMETER   0.064/* m *///0.067
-#define WHEEL_SEPARATION  0.2873//	/* m */0.252, 0.2629 0.2528 0.2771
-#define E_d 1.0139 //1.0057 1.01 1.0057
+#define WHEEL_SEPARATION  0.2686//0.2699//0.2594 //0.2771//0.2873//	/* m */0.252, 0.2629 0.2528 0.2771
+#define E_d 1.0074 //1.0057//1.0139 //1.0057 1.01 
 #define DELTA_M (M_PI * WHEEL_DIAMETER / 2000)
 #define ROBOTPORT	24902
 #define LOGLENGTH 4000
@@ -138,7 +138,8 @@ typedef struct{//input
 		// parameters
 		double w;//wheel base width
 		double kfr, kfl, kf; //K meter per encoder adjusment
-		double kw,k_follow; //proportional controller constants
+		double kw, ki,k_follow; //proportional controller constants
+		double kspeed1,kspeed2,kspeed3;
 		//output
 		double motorspeed_l,motorspeed_r; 
 		int finished;
@@ -199,7 +200,7 @@ int main()
 {
   int running,n=0,arg;
   double dist=0,angle=0;
-  double waypoints [5][2]={{2, 0},{2,2},{0, 2},{0,-0.15},{0,0}};
+  double waypoints [5][2]={{2, 0},{2,2},{0, 2},{0,0.15},{0,0}};
   int waypointcounter=0;
   int var1, var2;
   /* Establish connection to robot sensors and actuators.
@@ -315,8 +316,12 @@ int main()
   mot.t_speed=0;
   mot.t_speed_t=0;
   mot.kfr=mot.kfl=mot.kf=0.23;
-  mot.kw=0.1;
+  mot.kw=0.2;
   mot.k_follow=-0.01;
+  mot.kspeed1=5;
+  mot.kspeed2=5;
+  mot.kspeed3=8;
+  mot.ki=0.1;
   running=1; 
   mission.state=ms_init;
   mission.oldstate=-1;
@@ -361,8 +366,8 @@ int main()
    sm_update(&mission);
    switch (mission.state) {
     case ms_init:
-       n=4; dist=2.0;angle=90.0;
-       mission.state= ms_goto_setup;//ms_fwd;//ms_end;// ms_follow_line;//
+       n=1; dist=0.10;angle=10.0;
+       mission.state=ms_fwd;//ms_turn;// ms_end;//ms_fwd;//ms_goto_setup;// ms_follow_line;//
        mot.t_speed=40;mot.t_speed_t=20;
        waypointcounter=0;
     break;
@@ -379,7 +384,7 @@ int main()
       mission.state=ms_goto1;
     break;
     case ms_goto1://REVISE
-       if (turn(angle,0.2,mission.time))
+       if (turn(angle,0.1,mission.time))
        
         mission.state=ms_goto2;
         //printf("%f\n",angle);
@@ -424,7 +429,7 @@ int main()
     break;
     
     case ms_turn:
-      if (turn(angle,0.2,mission.time)){//mot.t_speed_t
+      if (turn(angle,0.1,mission.time)){//mot.t_speed_t
          n=n-1;
       if (n==0) 
 	      mission.state=ms_end;
@@ -506,9 +511,9 @@ void update_odo(odotype *p)
   double delta_lpos = delta * p->cl;
   
   double Ui = (delta_lpos + delta_rpos) / 2;
+  p->theta = p->old_theta + (delta_rpos - delta_lpos)/p->w;
   p->x = p->old_x + Ui*cos(p->theta);
   p->y = p->old_y + Ui*sin(p->theta);
-  p->theta = p->old_theta + (delta_rpos - delta_lpos)/p->w;
   p->ran_dist+=Ui;
   
   //printf("v=%f \n",(p->x-p->old_x)/0.01);
@@ -553,12 +558,6 @@ if (p->cmd !=0){
          p->start_theta=q->theta;
 	       p->start_x = q->x;
 	       p->start_y = q->y;
-	       
-	       //revise
-         /*if (p->angle > 0) 
-	        p->startpos=p->right_pos;
-	       else
-	        p->startpos=p->left_pos;*/
          p->curcmd=mot_turn;
        break;
        
@@ -581,8 +580,12 @@ if (p->cmd !=0){
           p->motorspeed_r=0;
        }	  
        else {
-          double delta_v = p->kw*(q->theta-p->start_theta);
+          double distance=fabs(tan(tan(q->theta)*(q->x-p->start_x)-(q->y-p->start_y)))/sqrt(tan(q->theta)*tan(q->theta)+1);
+          
           myspeed(p->t_speed, p, q, s);
+          
+          double delta_v =(p->kw*p->kspeed1*(q->theta-p->start_theta)+p->ki*p->kspeed2*distance)*p->speedcmd;
+          
           if (!(p->speedcmd+delta_v>1||p->speedcmd+delta_v<-1||p->speedcmd-delta_v>1||p->speedcmd-delta_v<-1)) 
           {
 	          p->motorspeed_l=p->speedcmd+delta_v;//*kfl/kf
@@ -607,7 +610,7 @@ if (p->cmd !=0){
        }	  
        else {
           myspeed(p->t_speed, p, q, s);
-          double delta_v = p->k_follow*(s->min_line_sensor-3.5)*p->speedcmd*8;
+          double delta_v = p->k_follow*(s->min_line_sensor-3.5)*p->speedcmd*p->kspeed3;
                     if (!(p->speedcmd+delta_v>1||p->speedcmd+delta_v<-1||p->speedcmd-delta_v>1||p->speedcmd-delta_v<-1)) 
           {
 	          p->motorspeed_l=p->speedcmd+delta_v;//*kfl/kf
@@ -627,7 +630,7 @@ if (p->cmd !=0){
        myspeed_t(p->t_speed_t, p, q, s);
        if (p->angle>0){
           
-	      if (q->theta-p->start_theta< p->angle){
+	      if (q->theta - p->start_theta < p->angle){
 	          p->motorspeed_r=p->t_speedcmd;
 	          p->motorspeed_l=-(p->t_speedcmd);
 	      }
@@ -857,8 +860,8 @@ void update_sensors(sensetype *s, odotype *q)
 }
 void update_map(odotype *q, sensetype *s ,maptype *m){
   int i,j,k,n,sign;
-  m->theta=M_PI/4;
-  //m->theta=atan2(m->y,m->x); aplly later
+  m->theta=0.0;//M_PI/4;
+  //m->theta=atan2(m->y-m->old_y,m->x-m->old_x); aplly later
   if (!(m->map[m->x][m->y]%3==0))
       m->map[m->x][m->y]*=3;
   if (!(m->map[m->xg][m->yg]%7==0))
@@ -872,7 +875,7 @@ void update_map(odotype *q, sensetype *s ,maptype *m){
         for(n=0;n<9;n++){
           
           if(m->map[m->x+i*sign][m->y+j*sign]<0){
-            if(atan2(m->y+j*sign,m->x+i*sign)>=m->alpha*n+m->theta-M_PI/2 && atan2(m->y+j*sign,m->x+i*sign)<m->alpha*(n+1)+m->theta-M_PI/2){
+            if(atan2(j*sign,i*sign)>=m->alpha*n+m->theta && atan2(j*sign,i*sign)<m->alpha*(n+1)+m->theta){
               if(sqrt(i*i+j*j)*m->cell<s->laser[n]){
                 m->map[m->x+i*sign][m->y+j*sign]=m->map[m->x+i*sign][m->y+j*sign]*-2;//*-1 to say it was discovered and in the map. *2 to put it in the accesible points
                 if (pow(m->xg-m->x+i*sign,2)+pow(m->yg-m->y+j*sign,2)<((m->xg-m->xcg)*(m->xg-m->xcg)+(m->xg-m->xcg)*(m->xg-m->xcg))){
