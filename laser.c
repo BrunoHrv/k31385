@@ -101,10 +101,7 @@ typedef struct{
   int min_line_sensor;
   int max_line_sensor;
   int black_line_follow;
-  int lost; //true or false
-  int cross; //true or false
-  int fork; //true or false
-  int fork_test;
+  int lost;
   
   double ir_min;
   double irsensor[IR_SENS_LENGTH];
@@ -140,7 +137,6 @@ typedef struct{//input
 		double dist;//aim distance
 		double angle;// aim angle
 		double delta_v; //controller add up. depends on what calls it(follow line, move straight...)
-		double real_dist;
 		double left_pos,right_pos;
 	
 		// parameters
@@ -171,8 +167,7 @@ typedef struct{
 typedef struct{
     int state,oldstate;
 		int time;
-		int sub_time;
-		    }smtype;
+	       }smtype;
 
 typedef struct{
 		double log[LOGHEIGHT][LOGLENGTH];
@@ -184,8 +179,7 @@ enum {mot_stop=1,mot_move,mot_turn, mot_follow_line};
 void update_motcon(motiontype *p, odotype *q, sensetype *s);	       
 
 int fwd(double dist, double speed,int time);
-int follow_line(double dist, double speed, char dir,int time);
-int recover_line(int time);
+int follow_line(double dist, double speed,int time);
 int turn(double angle, double speed,int time);
       
 void myspeed(int aim, motiontype *p, odotype *q, sensetype *s);
@@ -208,6 +202,7 @@ const double BLACK_THRESHOLD = 0.3;
 const double WHITE_THRESHOLD = 0.75;
 
 int cross_counter;
+int cross;
 
 
 enum {ms_init,ms_goto1,ms_goto_setup,ms_goto2,ms_fwd,ms_follow_line,ms_turn,ms_end};
@@ -221,7 +216,7 @@ int main()
   int waypointcounter=0;
   int var1, var2;
   cross_counter = 0;
-  sest.cross = 0;
+  cross = 0;
   /* Establish connection to robot sensors and actuators.
    */
      if (rhdConnect('w',"localhost",ROBOTPORT)!='w'){
@@ -386,7 +381,7 @@ int main()
    sm_update(&mission);
    switch (mission.state) {
     case ms_init:
-       n=4; dist=2.0;angle=90.0;
+       n=4; dist=1.0;angle=90.0;
        mission.state=ms_follow_line; //ms_fwd; //ms_end; //ms_fwd; //ms_turn; // ms_fwd; //ms_goto_setup; // 
        mot.t_speed=40;mot.t_speed_t=20;
        waypointcounter=0;
@@ -407,8 +402,22 @@ int main()
        if (turn(angle,0.1,mission.time))
        
         mission.state=ms_goto2;
+        //printf("%f\n",angle);
+        //printf("%f\n", ((atan2((waypoints[waypointcounter][1]-odo.y),(waypoints[waypointcounter][0]-odo.x))-odo.theta)*180/M_PI));
+        //printf("y= %f ,x=%f \n",(waypoints[waypointcounter][1]-odo.y),(waypoints[waypointcounter][0]-odo.x));
+         /*{
+          printf("done fw %f \n",sqrt(pow((waypoints[waypointcounter][1]-odo.y),2)+pow((waypoints[waypointcounter][0]-odo.x),2)));
+          
+          
+          
+          printf("I changed the mission\n");
+         }*/
+       
+       
     break;
+    
     case ms_goto2:
+        
        if (fwd(dist,mot.t_speed,mission.time)) 
        {
          waypointcounter++;
@@ -419,6 +428,7 @@ int main()
           mission.state=ms_goto_setup;
          }
        }  
+       
        
     break;
     
@@ -433,7 +443,7 @@ int main()
     case ms_follow_line:
        //if(sets->lost)
        // mission.state=ms_recoverline;
-       if (follow_line(dist,mot.t_speed, 'l',mission.time))  
+       if (follow_line(dist,mot.t_speed,mission.time))  
         mission.state=ms_end;
     break;
     
@@ -580,7 +590,7 @@ if (p->cmd !=0){
      break;
      case mot_move:
        
-       if (p->real_dist > p->dist){
+       if (sqrt(pow((q->x)-(p->start_x),2)+pow((q->y)-(p->start_y),2)) > p->dist){
           p->finished=1;
 	        p->motorspeed_l=0;
           p->motorspeed_r=0;
@@ -635,13 +645,11 @@ if (p->cmd !=0){
 }   
 
 int fwd(double dist, double speed,int time){
-     //double distance=fabs(tan(mot.start_theta)*(odo.x)-(odo.y)+tan(mot.start_theta)*mot.start_x+mot.start_y)/sqrt(tan(odo.theta)*tan(odo.theta)+1);
-     //I controlle rnot implemented
-     mot.delta_v=(mot.kw*mot.kspeed1*(odo.theta-mot.start_theta));//+mot.ki*mot.kspeed2*distance)*mot.speedcmd;
-     mot.real_dist=sqrt(pow((odo.x)-(mot.start_x),2)+pow((odo.y)-(mot.start_y),2));
    if (time==0){ 
-          
-      mot.cmd=mot_move;
+     double distance=fabs(tan(mot.start_theta)*(odo.x)-(odo.y)+tan(mot.start_theta)*mot.start_x+mot.start_y)/sqrt(tan(odo.theta)*tan(odo.theta)+1);
+          //I controlle rnot implemented
+     mot.delta_v=(mot.kw*mot.kspeed1*(odo.theta-mot.start_theta));//+mot.ki*mot.kspeed2*distance)*mot.speedcmd;
+     mot.cmd=mot_move;
      mot.speedcmd=speed;
      mot.dist=dist;
      return 0;
@@ -654,15 +662,9 @@ int fwd(double dist, double speed,int time){
      
 }
 
-int follow_line(double dist, double speed, char dir,int time){
-   mot.delta_v= mot.k_follow*(sest.min_line_sensor-3.5)*mot.speedcmd;//follow black 
-   //mot.delta_v= mot.k_follow*(sest.max_line_sensor-3.5)*mot.speedcmd;
-   mot.real_dist=odo.ran_dist;
-   /*if (sest.lost){ 
-      
-      recover_line(time-mission.sub_time);
-   }*/ 
+int follow_line(double dist, double speed,int time){
    if (time==0){ 
+     mot.delta_v= mot.k_follow*(sest.min_line_sensor-3.5)*mot.speedcmd;//follow black 
      mot.cmd=mot_move;
      mot.speedcmd=speed;
      mot.dist=dist;
@@ -675,39 +677,21 @@ int follow_line(double dist, double speed, char dir,int time){
     return 0;
 }
 
-int recover_line(int time){
-  
-   if (sest.min_line_sensor==0)sest.min_line_sensor=1;
-   if (sest.min_line_sensor==7)sest.min_line_sensor=6;
-   if ((sest.linesensor[sest.min_line_sensor]< BLACK_THRESHOLD && ((sest.linesensor[sest.min_line_sensor+1]< BLACK_THRESHOLD)||
-        (sest.linesensor[sest.min_line_sensor-1]< BLACK_THRESHOLD)))){
-        sest.lost=0;
-        
-        return 0;
-   }
+/*int recover_line(int time){
    if (time==0){ 
-     mot.cmd=mot_stop;
+     mot.delta_v= mot.k_follow*(sest.min_line_sensor-3.5)*mot.speedcmd;//follow black 
+     
+     mot.cmd=mot_follow_line;
+     mot.speedcmd=speed;
+     mot.dist=dist;
+     odo.ran_dist=0;
+     return 0;
    }
-   else{ 
-     if(turn(90,0.15,time)){
-       mot.finished = 0;
-        if(turn(-180,0.15,time)){
-           mot.finished = 0;
-           if(turn(90,0.15,time)){
-              mot.finished = 0;
-              if(fwd(0.3,-0.2,time))
-              mot.finished = 0;
-           }
-        }
-     }
-    }   
-   
-   
-   if(mot.finished == 1)
+   else if(mot.finished == 1)
      return mot.finished;
    else
     return 0;
-}
+}*/
 
 int turn(double angle, double speed,int time){
    if (time==0){ 
@@ -821,7 +805,6 @@ void update_sensors(sensetype *s, odotype *q)
   int lost_counter = 0;
   int line_counter =0;
   int white_line_counter = 0;
-  int fork_counter = 0;
   int i = 0;
   int min_line_sensor = 3;
   int max_line_sensor = 3; // for the center on case all sensors are the same
@@ -848,55 +831,29 @@ void update_sensors(sensetype *s, odotype *q)
     //count number of sensors who see black line
     if(s->linesensor[i] < BLACK_THRESHOLD){
       line_counter++;
-      if (fork_counter==0||fork_counter==2)
-         fork_counter++;
     }
-    else{
-      if (fork_counter==1)
-         fork_counter++;
-      if(s->linesensor[i] > BLACK_THRESHOLD && s->linesensor[i] < WHITE_THRESHOLD){
-        lost_counter++;
-      }
-      //count number of sensors who see white line
-      else if(s->linesensor[i] > WHITE_THRESHOLD){
-        white_line_counter++;
-      }
+
+    //count number of sensors who see white line
+    else if(s->linesensor[i] > WHITE_THRESHOLD){
+      white_line_counter++;
     }
+    
+    if(s->linesensor[i] < BLACK_THRESHOLD && s->linesensor[i] > WHITE_THRESHOLD){
+      lost_counter++;
+    }
+    
   }
   
   
-  if(line_counter == 8 && !s->cross){ 
+  if(line_counter == 8 && !cross){ 
     cross_counter++;
-    s->cross=1;
+    cross=1;
   }
   if(line_counter < 8){ 
-    s->cross=0;
+    cross=0;
   }
   
-  if(lost_counter > 7){
-    s->lost = 1;
-    mission.sub_time=mission.time;
-    printf("Help I'm lost... ");
-  }
-  
-  if(fork_counter == 3)
-  {
-    s->fork_test ++;
-    
-    if(s->fork_test>5){
-      printf("FORK found! \n");
-      s->fork = 1;
-    }
-    else
-    {
-      s->fork=0;
-    }
-  }
-  else
-  {
-    s->fork_test = 0;
-    s->fork=0;
-  }
+  if(lost_counter > 7){s->lost = 1; printf("Help I'm lost");}
   
   
   

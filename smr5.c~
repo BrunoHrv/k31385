@@ -881,21 +881,12 @@ void update_sensors(sensetype *s, odotype *q)
   
   if(fork_counter == 3)
   {
-    s->fork_test ++;
-    
-    if(s->fork_test>5){
-      printf("FORK found! \n");
-      s->fork = 1;
-    }
-    else
-    {
-      s->fork=0;
-    }
+    s->fork = 1;
+    printf("FORK found! \n");
   }
   else
   {
-    s->fork_test = 0;
-    s->fork=0;
+    s->fork = 0;
   }
   
   

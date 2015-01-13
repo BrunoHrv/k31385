@@ -1,0 +1,5 @@
+log "$irdistfrontmiddle" "$irdistright" "$irdistleft"
+followline "bm" @v 0.15 :($irdistright < .17 )
+wait 1
+followline "bm" @v 0.1 :($drivendist > .5)
+stop

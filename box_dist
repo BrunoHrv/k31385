@@ -1,0 +1,11 @@
+t = 0
+log "$irdistfrontmiddle" "$odox" "$odoy" "$odoth" "$drivendist"
+followline "br" @v 0.3:($irdistfrontmiddle < .17)
+stop
+turn 180
+wait 0.5
+t = abs($odoy)
+followline "bm" @v 0.3:($odoy < t*.25)
+turn 180
+followline "bl" @v 0.3:($drivendist > 4)
+stop
