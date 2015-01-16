@@ -1,22 +1,26 @@
-log "$irdistleft" "$drivendist"
-followline "wm" @v 0.15 :($irdistleft < .17 )
+log "$irdistleft" "$drivendist" "$odoth"
+followline "bm" @v 0.15 :($irdistleft < .17 )
 stop
 fwd .5 @v 1.5 @a .1
 stop 
+
 turn 90
+theta = $odoth + 5
 fwd .2 @v .1
 stop
 followwall "left" .2 @v 0.1 :($irdistleft > .4 )
+label "turnLoop"
+turn -1
+if ($odoth > theta) "turnLoop"
+fwd .4 @v 0.1
 stop
-fwd .45 @v 0.1
-stop
-turn 90 @v .1
+turn 90 @v 0.1
 stop
 fwd .6 @v 1.5 @a .1
 stop
 turn 90 @v .1
 stop
-fwd .45 @v 0.1
+fwd .3 @v 0.1
 stop
 followwall "left" .2  @v 0.1 :($irdistleft > .4 )
 stop
@@ -24,4 +28,4 @@ fwd .45 @v 0.1
 stop
 turn 90 @v .1
 stop
-followline "wm" @v 0.15 :($drivendist < .6 )
+followline "bm" @v 0.15 :($drivendist > .6 )

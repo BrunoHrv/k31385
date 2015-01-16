@@ -11,10 +11,12 @@ grid on;
 plot(1:end_value,filename(4,1:end_value),'g');
 plot(1:end_value,filename(5,1:end_value),'r');
 plot(1:end_value,filename(6,1:end_value),'c');
-plot(1:end_value,filename(7,1:end_value),'--b');
+plot(1:end_value,filename(7,1:end_value),'b');
 plot(1:end_value,filename(8,1:end_value),'--g');
 plot(1:end_value,filename(9,1:end_value),'--r');
 plot(1:end_value,filename(10,1:end_value),'--c');
+plot(1:end_value,filename(11,1:end_value),'--b');
+plot(1:end_value,filename(12,1:end_value),'k');
 hold off;
 
 % mymean=[mean(filename(4,1:end_value)) mean(filename(5,1:end_value)) mean(filename(6,1:end_value)) mean(filename(7,1:end_value)) mean(filename(8,1:end_value)) mean(filename(9,1:end_value)) mean(filename(10,1:end_value)) mean(filename(11,1:end_value))]; 

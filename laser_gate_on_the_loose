@@ -1,3 +1,227 @@
 laser "scanpush cmd='zoneobst'"
-log "$l0" "$l8"
-wait 10
+%log "$l0" "$l8" %l0 is left, l8 is right
+array "laserArray" 9
+wait 2
+changed = 0
+m=4
+m2 = 4
+n=0
+v=1000
+v2 = 1000
+V=1000
+i=0
+s=4
+
+
+
+fwd .1 @v 0.3  @a 0.1
+log "laserArray[0]" "laserArray[1]" "laserArray[4]" "laserArray[7]" "laserArray[8]" "m" "m2" "v" "v2"
+
+label "mainReturn"
+call "simpleCheckLaser"
+if  (v > 1) "approachGate"
+if (v <= 1 & v > .2) "closeApproachGate"
+if (v <= .2 ) "CHARGE"
+exit
+
+
+  
+label "approachGate"
+s=m
+if (changed == 1) "turn"
+label "turnReturn"
+f = laserArray[m]/4
+fwd f @v 0.3  @a 0.1
+goto "mainReturn"
+
+
+
+label "turn"
+switch (s)
+  turn 40
+case 1
+  turn 30
+case 2
+  turn 20
+case 3
+  turn 10
+case 4
+  
+case 5
+  turn -10
+case 6
+  turn -20
+case 7
+  turn -30
+case 8
+  turn -40
+endswitch
+goto "turnReturn"
+
+
+
+
+
+label "closeApproachGate"
+n=0
+label "doubleMinLoop"
+v = laserArray[m]    %v = minimum laser value
+V = laserArray[n]    %V = current laser value
+v2 = laserArray[m2]
+if (V < v & V < 2) "mUpdate"
+label "mUpdateReturn"
+if (V < v2  & n != m & (V - .3) <= v & V < 2) "m2Update"
+  if ((V - .3) > v & V < v2  & n != m & V < 2) "reverseTurn"
+label "m2UpdateReturn"
+n = n+1
+if (n < 9) "doubleMinLoop"
+s = abs((m+m2)/2)
+if (changed == 1) "closeTurn"
+label "closeTurnReturn"
+fwd .1 @v 0.3  @a 0.1
+goto "mainReturn"
+
+
+
+
+label "reverseTurn"
+switch (s)
+  turn -40
+case 1
+  turn -30
+case 2
+  turn -20
+case 3
+  turn -10
+case 4
+  
+case 5
+  turn 10
+case 6
+  turn 20
+case 7
+  turn 30
+case 8
+  turn 40
+endswitch
+goto  "closeTurnReturn"
+
+
+
+
+
+
+
+label "closeTurn"
+switch (s)
+  turn 40
+case 1
+  turn 30
+case 2
+  turn 20
+case 3
+  turn 10
+case 4
+  m=m
+case 5
+  turn -10
+case 6
+  turn -20
+case 7
+  turn -30
+case 8
+  turn -40
+endswitch
+goto  "closeTurnReturn"
+
+
+
+
+
+
+label "mUpdate"
+m = n
+changed = 1
+goto "mUpdateReturn"
+
+
+
+label "m2Update"
+m2 = n
+changed = 1
+goto "m2UpdateReturn"
+
+
+label "minUpdate"
+m=n
+changed = 1
+goto "minUpdateReturn"
+
+
+
+label "CHARGE"
+if (m == 4 | m2 == 4 | m == 3 | m2 == 3 | m == 5 | m2 == 5) "turnSlight"
+fwd .8 @v 0.3 @a 0.2
+fwd -1.5
+exit
+return
+
+
+label "turnSlight"
+ignoreobstacles
+if (m2 > m) "turnRight"
+ignoreobstacles
+if (m2 < m) "turnLeft"
+goto "mainReturn"
+
+
+
+label "turnLeft"
+ignoreobstacles
+turn 10 @v 0.1
+goto "mainReturn"
+
+
+label "turnRight"
+ignoreobstacles
+turn 10 @v 0.1
+goto "mainReturn"
+
+
+
+
+
+
+label "simpleCheckLaser"
+laserArray[0] = $l0
+laserArray[1] = $l1
+laserArray[2] = $l2
+laserArray[3] = $l3
+laserArray[4] = $l4
+laserArray[5] = $l5
+laserArray[6] = $l6
+laserArray[7] = $l7
+laserArray[8] = $l8
+
+m=0
+n=0
+label "loopMinGate"
+v = laserArray[m]    %v = minimum laser value
+V = laserArray[n]    %V = current laser value
+%log "V" "v"
+if (V < v & V < 2) "minUpdate"
+label "minUpdateReturn"
+n = n + 1
+if (n < 9) "loopMinGate"
+v = laserArray[m]
+return
+
+
+
+
+
+
+
+
+
+
