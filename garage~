@@ -1,0 +1,40 @@
+
+
+
+followline "bm" :($irdistfrontmiddle<0.15)
+turn 90
+followwall "right" 0.25 :($irdistright > .35)
+fwd 0.33 @v 0.2
+turn -90
+fwd 0.35 @v 0.2
+turn -180 @v0.8
+fwd .35 
+turn 90 @v 0.3
+ignoreobstacles
+drive @v .3 :($blacklinefound)
+ignoreobstacles
+fwd .2
+ignoreobstacles
+turn 90
+followline "bm" :($irdistfrontmiddle<0.15)
+fwd -1.5 @v 0.2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

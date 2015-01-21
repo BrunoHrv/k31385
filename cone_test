@@ -1,0 +1,2 @@
+ignoreobstacles
+followline "bm" @v 0.3 :($drivendist > 1.5)

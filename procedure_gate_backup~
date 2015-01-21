@@ -1,0 +1,86 @@
+laser "scanpush cmd='zoneobst'"
+x = $l0
+y = 0
+foundPillar = 0
+array "laserArray" 9
+changed = 0
+m=4
+m2 = 4
+n=0
+v=1000
+v2 = 1000
+V=1000
+i=0
+s=4
+
+
+
+
+log "$odox" "$l0" "x" "foundPillar"
+label "findingGate"
+temp = x-.5
+if ($l0 == x) "updateLaser"
+followline "bm" @v 0.1 :($l0 < x - .2 | $drivendist > .05 | $irdistfrontmiddle < .2)
+x = $l0
+if ($irdistfrontmiddle < .2) "stopLabel"
+if ($l0 > x | $l0 > 1) "findingGate"
+x = $l0
+foundPillar = foundPillar + 1
+if (foundPillar == 2) "stopLabel"
+fwd .37
+goto "findingGate"
+
+
+
+label "stopLabel"
+fwd .2
+turn 90
+drive @v 0.15 :($irdistfrontmiddle < .17 )
+turn 180
+drive @v 0.15 :($crossingblackline)
+fwd .2
+turn 90
+exit
+
+
+
+label "updateLaser"
+fwd .02
+goto "findingGate"
+
+
+
+turn 10 @v 0.1
+goto "mainReturn"
+
+
+label "turnRight"
+ignoreobstacles
+turn 10 @v 0.1
+goto "mainReturn"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

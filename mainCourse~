@@ -1,0 +1,254 @@
+laser "scanpush cmd='zoneobst'"
+
+boxdist = 0
+%log "boxdist"
+goto "main"
+
+
+
+
+
+gate = 0
+log "$odoy" "$odox" "$l4" "boxdist"
+fwd .1
+call "findBox"
+
+
+fwd 0.2 
+turn -90
+
+call "pushTheBox"
+
+followline "br" :($drivendist > 1)
+fwd .2
+
+
+label "main"
+call "gateOnTheLoose"
+
+followline "bm" @v 0.3:($crossingblackline)
+fwd .2
+turn 90
+
+
+call "wall"
+
+followline "bm" @v 0.3:($irdistfrontmiddle < .2)
+
+call "cone"
+
+call "whiteLine"
+
+
+
+fwd .1 @v 0.1
+followline "bm" @v 0.1:($crossingblackline)
+fwd .2 @v 0.1
+turn -90
+
+call "garage"
+exit
+
+
+
+label "cone"
+ignoreobstacles
+followline "bm" @v 0.3:($crossingblackline)
+ignoreobstacles
+fwd .6
+fwd -0.7
+return
+
+
+
+
+
+
+
+label "findBox"
+t = 0
+followline "br" @v 0.4:($l4 < .15)
+stop
+wait 0.5
+boxdist = abs($odoy) + abs($l4) + .2
+
+turn 180
+
+t = abs($odoy)
+followline "bm" @v 0.4:(abs($odoy) < t*.15)
+turn 180 @v 0.3
+followline "bl" @v 0.15:($drivendist > .5)
+followline "bm" @v 0.4: ($crossingblackline)
+
+return
+
+
+
+
+label "pushTheBox"
+followline "bm" :($irdistfrontmiddle < 0.17)
+ignoreobstacles
+drive @v 0.3 :($cmdtime > 2.3)
+ignoreobstacles
+fwd -1 @v 0.25
+turn -90
+drive @v 0.3 :($blacklinefound) 
+fwd 0.2 @v 0.2 
+turn 90 @v 0.2
+followline "bm" @v 0.3 :($crossingblackline)
+fwd 0.2 @v 0.2 
+turn 90
+followline "bm" @v 0.3 :($drivendist > .8)
+%fwd 0.2
+%followline "bm" :($crossingblackline)
+%fwd 0.2
+%turn 90
+return
+
+
+label "garage"
+ignoreobstacles
+followline "bm" @v 0.3:($l4<0.15)
+turn 87 @v 0.3  @a 0.2
+drive @v 0.2 :($irdistright > .4)
+fwd 0.37 @v 0.2
+turn -90
+fwd 0.35 @v 0.2
+turn -180 @v 1  @a 0.7
+fwd .35 @v 0.3
+turn 90 @v 0.3
+ignoreobstacles
+drive @v .3 :($blacklinefound)
+ignoreobstacles
+fwd .2
+ignoreobstacles
+turn 90 @v 0.1
+followline "bm" @v 0.5:($l4<0.2)
+
+return
+
+
+label "wall"
+followline "bm" @v 0.15 :($irdistleft < .17 | $irdistright < .17)
+ignoreobstacles
+fwd .5 @v .2 @a .1
+stop 
+
+turn 90
+theta = $odoth + 2
+fwd .2 @v .3
+stop
+followwall "left" .25 @v 0.2 :($irdistleft > .4  | $l1 > .5)
+fwd .6 @v 0.2
+turn 90 @v 0.1
+stop
+fwd .75 @v .2 @a .1
+stop
+turn 90 @v .1
+stop
+fwd .45 @v 0.2
+stop
+followwall "left" .15  @v 0.2 :($irdistleft > .4 | $l1 > .5)
+stop
+drive @v 0.3 :($blacklinefound)
+fwd .2 @v 0.2
+stop
+turn 90 @v .1
+stop
+
+return
+
+
+
+label "whiteLine"
+label "findingWhiteLine"
+ignoreobstacles
+drive @v 0.2 :($drivendist > .03)
+ 
+ 
+if($line0 >0.8) "whiteLineTask"
+if($line1 >0.8) "whiteLineTask"
+if($line2 >0.8) "whiteLineTask"
+if($line3 >0.8) "whiteLineTask"
+if($line4 >0.8) "whiteLineTask"
+if($line5 >0.8) "whiteLineTask"
+if($line6 >0.8) "whiteLineTask"
+if($line7 >0.8) "whiteLineTask"
+goto "findingWhiteLine"
+ 
+ 
+ 
+ 
+label "whiteLineTask"
+ignoreobstacles
+fwd .2
+label "turnToLine"
+turn 5 @v .6
+if ($line3 < .85) "turnToLine"
+%followline "wm" @v0.1:($irdistright < .2 | $irdistleft < .2)
+%fwd .1
+%followline "wm" @v0.1:($irdistright < .2 | $irdistleft < .2)
+%fwd .05 @v 0.1
+followline "wm" @v 0.25:($crossingblackline)
+return
+ 
+
+
+
+label "gateOnTheLoose"
+x = $l0
+foundPillar = 0
+label "findingGate"
+
+if ($l0 == x) "updateLaser"
+followline "bm" @v 0.1 :($l0 < x - .2 | $drivendist > .05 | $irdistfrontmiddle < .2)
+x = $l0
+if ($irdistfrontmiddle < .2) "stopLabel"
+if ($l0 > x | $l0 > 1) "findingGate"
+x = $l0
+foundPillar = foundPillar + 1
+if (foundPillar == 2) "stopLabel"
+fwd .37
+goto "findingGate"
+
+
+
+label "stopLabel"
+fwd .2 @v 0.3
+turn 90
+drive @v 0.15 @v 0.3:($irdistfrontmiddle < .17 )
+turn 180
+drive @v 0.15 @v 0.3:($crossingblackline)
+fwd .2
+turn 90
+return
+
+
+
+label "updateLaser"
+fwd .02
+goto "findingGate"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
