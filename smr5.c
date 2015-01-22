@@ -395,7 +395,7 @@ int main()
    switch (mission.state) {
     case ms_init:
        n=1; dist=0.25;angle=90.0;
-       mission.state=ms_goto_wall; //ms_measure_box; //ms_goto_gate_loose;//ms_measure_box; //ms_follow_line; 
+       mission.state=ms_measure_box; //ms_goto_gate_loose;//ms_measure_box; // 
        speed=40;
        mot.flag_collision = 0;
     break;    
@@ -1141,12 +1141,25 @@ int push_the_box(double speed, int time){
     return 0;
 }
 int follow_white_line(double speed, double time){
+  if(sens.w_cross && mission.sub_m_flag<11  && mission.sub_m_flag != 2 && mission.sub_m_flag != 7){
+    mission.sub_m_flag=11;
+    mission.sub_time=0;
+    }
+    /*if (mission.sub_m_flag==0){
+      mission.sub_m_flag=9;
+      mission.sub_time=0;
+      }*/
   switch(mission.sub_m_flag)
   {
     case 0:
-      if(follow_line(speed,'c',0, mission.sub_time, odo.ran_dist > robot_length && sens.laser[4] < 0.2)){//follow line until black cross
+    
+      if(follow_line(speed,'c',0, mission.sub_time, ((odo.ran_dist > robot_length && sens.laser[4] < 0.2)||(odo.ran_dist > robot_length && sens.cross)))){//follow line until black cross  
           mission.sub_m_flag=1;
           mission.sub_time=(-1);
+          if (odo.ran_dist > robot_length && sens.cross){
+            printf("Im retarded");
+            mission.sub_m_flag=10;
+          }
       }
     break;
     case 1:
@@ -1170,7 +1183,7 @@ int follow_white_line(double speed, double time){
     break;
     case 4:
       //find the white line
-      if(fwd(robot_length*1.5 + 0.20, speed, mission.sub_time, 0)){//go forward until white cross
+      if(fwd(robot_length*1.5 + 0.15, speed, mission.sub_time, 0)){//go forward until white cross
           mission.sub_m_flag=5;
           mission.sub_time=(-1);
       }
@@ -1197,7 +1210,7 @@ int follow_white_line(double speed, double time){
     break;
      case 14:
       //find the white line
-      if(fwd(0.1, -1*speed, mission.sub_time, mission.sub_time > 250)){//go forward until white cross
+      if(fwd(0.1, -1*speed/2, mission.sub_time, mission.sub_time > 250)){//go forward until white cross
           mission.sub_m_flag=8;
           mission.sub_time=(-1);
       }
@@ -1209,7 +1222,7 @@ int follow_white_line(double speed, double time){
       }
     break;
     case 9:
-      if(follow_line(speed,'c',0, mission.sub_time, sens.cross && odo.ran_dist >= 0.10)){//follow line until black cross
+      if(follow_line(speed/2,'c',0, mission.sub_time, sens.cross )){//follow line until black cross
           mission.sub_m_flag=10;
           mission.sub_time=(-1);
       }

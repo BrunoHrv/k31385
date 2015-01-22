@@ -7,7 +7,7 @@ goto "main"
 
 
 
-
+label "main"
 gate = 0
 log "$odoy" "$odox" "$l4" "boxdist"
 fwd .1
@@ -23,7 +23,7 @@ followline "br" :($drivendist > 1)
 fwd .2
 
 
-label "main"
+
 call "gateOnTheLoose"
 
 followline "bm" @v 0.3:($crossingblackline)
@@ -33,12 +33,12 @@ turn 90
 
 call "wall"
 
+
 followline "bm" @v 0.3:($irdistfrontmiddle < .2)
 
 call "cone"
 
 call "whiteLine"
-
 
 
 fwd .1 @v 0.1
@@ -53,10 +53,22 @@ exit
 
 label "cone"
 ignoreobstacles
-followline "bm" @v 0.3:($crossingblackline)
+turn 90
+fwd .5
+turn -90
 ignoreobstacles
-fwd .6
-fwd -0.7
+fwd .5
+turn -90
+ignoreobstacles
+drive @v 0.2 :($crossingblackline | $cmdtime > 2)
+ignoreobstacles
+fwd .2
+ignoreobstacles
+turn 90
+%followline "bm" @v 0.3:($crossingblackline)
+%ignoreobstacles
+%fwd .6
+%fwd -0.7
 return
 
 
@@ -67,11 +79,11 @@ return
 
 label "findBox"
 t = 0
-followline "br" @v 0.4:($l4 < .15)
+followline "br" @v 0.4:($l4 < .25)
 stop
 wait 0.5
 boxdist = abs($odoy) + abs($l4) + .2
-
+eval boxdist
 turn 180
 
 t = abs($odoy)
@@ -129,6 +141,7 @@ return
 
 
 label "wall"
+ignoreobstacles
 followline "bm" @v 0.15 :($irdistleft < .17 | $irdistright < .17)
 ignoreobstacles
 fwd .5 @v .2 @a .1
